@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Attack Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04060e;
+  --panel:#080c1a;
+  --card:#0d1220;
+  --border:#182040;
+  --border2:#243060;
+  --green:#00ff90;
+  --cyan:#00d4ff;
+  --red:#ff2255;
+  --orange:#ff7a1a;
+  --yellow:#ffe94d;
+  --purple:#cc66ff;
+  --blue:#4488ff;
+  --dim:#1e2840;
+  --txt:#c8d8f8;
+  --muted:#3a4f7a;
+  --muted2:#5a72a8;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--txt);font-family:'Nunito',sans-serif;min-height:100vh;overflow-x:hidden;}
+
+/* BG grid */
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,100,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,100,255,0.03) 1px,transparent 1px);
+  background-size:50px 50px;pointer-events:none;z-index:0;
+}
+
+/* HEADER */
+.hdr{
+  position:relative;z-index:10;
+  background:rgba(4,6,14,0.97);
+  border-bottom:1px solid var(--border2);
+  padding:1rem 1.5rem;
+  display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;
+}
+.hdr-logo{
+  font-family:'Orbitron',sans-serif;
+  font-size:1.15rem;font-weight:900;
+  background:linear-gradient(90deg,var(--cyan),var(--green));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:0.08em;
+}
+.hdr-sub{font-family:'Share Tech Mono',monospace;font-size:0.65rem;color:var(--muted2);letter-spacing:0.15em;}
+
+/* SCENARIO SELECT */
+.scenario-bar{
+  position:relative;z-index:10;
+  display:flex;gap:0.5rem;flex-wrap:wrap;
+  padding:1rem 1.5rem 0;
+  background:rgba(4,6,14,0.95);
+}
+.sc-btn{
+  padding:0.45rem 1rem;
+  border-radius:8px 8px 0 0;
+  border:1px solid var(--border2);border-bottom:none;
+  background:var(--panel);
+  color:var(--muted2);
+  font-family:'Orbitron',sans-serif;font-size:0.6rem;font-weight:700;
+  cursor:pointer;transition:all 0.18s;letter-spacing:0.05em;
+  white-space:nowrap;
+}
+.sc-btn:hover,.sc-btn.active{
+  color:#fff;border-color:var(--cyan);
+  background:rgba(0,212,255,0.1);
+}
+.sc-btn.active{border-bottom:2px solid var(--cyan);}
+
+/* MAIN LAYOUT */
+.main{
+  position:relative;z-index:5;
+  display:grid;
+  grid-template-columns:1fr 360px;
+  grid-template-rows:auto auto;
+  gap:0;
+  border-top:1px solid var(--border2);
+  min-height:calc(100vh - 110px);
+}
+
+/* CANVAS AREA */
+.canvas-wrap{
+  grid-row:1/2;grid-column:1/2;
+  background:var(--panel);
+  border-right:1px solid var(--border);
+  padding:1.5rem;
+  position:relative;
+  min-height:420px;
+  display:flex;flex-direction:column;gap:1rem;
+}
+
+.canvas-title{
+  font-family:'Orbitron',sans-serif;
+  font-size:0.7rem;font-weight:700;
+  letter-spacing:0.12em;color:var(--muted2);
+  display:flex;align-items:center;gap:1rem;
+}
+.phase-badge{
+  font-family:'Share Tech Mono',monospace;
+  font-size:0.65rem;
+  padding:0.2rem 0.7rem;border-radius:12px;
+  border:1px solid var(--border2);
+  color:var(--cyan);border-color:var(--cyan);
+  background:rgba(0,212,255,0.08);
+  transition:all 0.4s;
+}
+
+/* SVG NETWORK CANVAS */
+#netSvg{
+  width:100%;height:320px;
+  border:1px solid var(--border);border-radius:12px;
+  background:radial-gradient(ellipse at 50% 50%,rgba(0,50,120,0.1) 0%,rgba(4,6,14,0.9) 100%);
+  overflow:visible;
+}
+
+/* STEP TIMELINE */
+.timeline{
+  grid-row:2/3;grid-column:1/2;
+  background:var(--card);
+  border-top:1px solid var(--border);
+  border-right:1px solid var(--border);
+  padding:1rem 1.5rem;
+  display:flex;gap:0;overflow-x:auto;
+  align-items:stretch;
+}
+.tl-step{
+  display:flex;flex-direction:column;align-items:center;
+  min-width:90px;
+  cursor:pointer;
+  position:relative;
+  padding:0.5rem 0.3rem;
+  transition:all 0.2s;
+  border-radius:8px;
+}
+.tl-step:hover{background:rgba(255,255,255,0.03);}
+.tl-step.active{background:rgba(0,212,255,0.07);}
+.tl-step.done .tl-dot{background:var(--green);box-shadow:0 0 8px var(--green);}
+.tl-step.active .tl-dot{background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:dotPulse 0.8s infinite;}
+.tl-dot{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--muted);border:2px solid var(--border2);
+  transition:all 0.3s;z-index:2;margin-bottom:0.4rem;
+}
+.tl-line{
+  position:absolute;top:1.15rem;left:calc(50% + 10px);
+  width:calc(100% - 20px);height:2px;
+  background:var(--border);z-index:1;transition:background 0.4s;
+}
+.tl-step.done .tl-line{background:var(--green);}
+.tl-step:last-child .tl-line{display:none;}
+.tl-label{font-size:0.6rem;font-family:'Share Tech Mono',monospace;color:var(--muted2);text-align:center;line-height:1.3;}
+.tl-step.active .tl-label,.tl-step.done .tl-label{color:var(--txt);}
+.tl-num{font-size:0.55rem;color:var(--muted);font-family:'Share Tech Mono',monospace;}
+
+/* RIGHT PANEL */
+.right-panel{
+  grid-row:1/3;grid-column:2/3;
+  display:flex;flex-direction:column;
+  background:var(--card);
+}
+
+.rp-header{
+  padding:1rem 1.2rem;
+  background:var(--panel);
+  border-bottom:1px solid var(--border2);
+}
+.rp-attack-name{
+  font-family:'Orbitron',sans-serif;
+  font-size:0.85rem;font-weight:900;letter-spacing:0.06em;
+  margin-bottom:0.3rem;
+}
+.rp-attack-type{
+  font-family:'Share Tech Mono',monospace;font-size:0.65rem;color:var(--muted2);
+}
+
+/* NARRATOR BOX */
+.narrator{
+  padding:1.2rem;
+  flex:1;
+  overflow-y:auto;
+  display:flex;flex-direction:column;gap:1rem;
+}
+
+.narr-phase{
+  font-family:'Orbitron',sans-serif;
+  font-size:0.6rem;font-weight:700;letter-spacing:0.15em;
+  text-transform:uppercase;
+  padding:0.3rem 0.7rem;border-radius:4px;
+  display:inline-block;margin-bottom:0.2rem;
+}
+.np-setup{background:rgba(68,136,255,0.15);color:var(--blue);border:1px solid rgba(68,136,255,0.3);}
+.np-normal{background:rgba(0,255,144,0.12);color:var(--green);border:1px solid rgba(0,255,144,0.3);}
+.np-attack{background:rgba(255,34,85,0.15);color:var(--red);border:1px solid rgba(255,34,85,0.3);}
+.np-result{background:rgba(255,122,26,0.15);color:var(--orange);border:1px solid rgba(255,122,26,0.3);}
+
+.narr-title{font-size:1rem;font-weight:800;margin-bottom:0.5rem;color:#fff;}
+.narr-text{font-size:0.82rem;color:var(--muted2);line-height:1.75;}
+.narr-text strong{color:var(--txt);}
+.narr-text .bad{color:var(--red);font-weight:700;}
+.narr-text .good{color:var(--green);font-weight:700;}
+.narr-text .warn{color:var(--yellow);font-weight:700;}
+.narr-text .info{color:var(--cyan);font-weight:700;}
+
+/* NODE DETAIL LIST */
+.node-list{display:flex;flex-direction:column;gap:0.4rem;margin-top:0.5rem;}
+.node-item{
+  display:flex;align-items:center;gap:0.7rem;
+  padding:0.5rem 0.7rem;border-radius:7px;
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  font-size:0.78rem;
+}
+.ni-icon{font-size:1.1rem;min-width:1.5rem;text-align:center;}
+.ni-name{font-weight:700;color:#fff;font-size:0.8rem;}
+.ni-role{font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted2);}
+
+/* CONTROL BAR */
+.ctrl{
+  padding:0.8rem 1.2rem;
+  background:var(--panel);
+  border-top:1px solid var(--border2);
+  display:flex;gap:0.6rem;align-items:center;
+  flex-wrap:wrap;
+}
+.btn{
+  padding:0.5rem 1.1rem;border-radius:8px;border:none;
+  font-family:'Orbitron',sans-serif;font-size:0.62rem;font-weight:700;letter-spacing:0.06em;
+  cursor:pointer;transition:all 0.18s;
+}
+.btn-next{background:var(--cyan);color:#000;}
+.btn-next:hover{box-shadow:0 0 20px rgba(0,212,255,0.5);transform:translateY(-1px);}
+.btn-next:disabled{opacity:0.3;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-prev{background:transparent;color:var(--muted2);border:1px solid var(--border2);}
+.btn-prev:hover{color:var(--txt);}
+.btn-prev:disabled{opacity:0.3;cursor:not-allowed;}
+.btn-auto{background:transparent;color:var(--green);border:1px solid var(--green);}
+.btn-auto:hover{background:rgba(0,255,144,0.1);}
+.btn-reset{background:transparent;color:var(--muted2);border:1px solid var(--dim);}
+.btn-reset:hover{color:var(--txt);}
+.step-counter{
+  margin-left:auto;font-family:'Share Tech Mono',monospace;
+  font-size:0.68rem;color:var(--muted2);
+}
+
+/* SVG elements */
+.node-circle{transition:all 0.5s;}
+.node-label-txt{font-family:'Share Tech Mono',monospace;font-size:11px;fill:#8aa0c8;}
+.node-role-txt{font-family:'Nunito',sans-serif;font-size:10px;fill:#4a6090;font-weight:700;}
+.link-line{stroke-width:1.5;stroke-dasharray:6 4;opacity:0.5;}
+.pkt{transition:cx 0.7s ease,cy 0.7s ease,opacity 0.4s;pointer-events:none;}
+
+@keyframes dotPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.4);}}
+@keyframes nodeJoin{0%{opacity:0;transform:scale(0.3);}60%{transform:scale(1.2);}100%{opacity:1;transform:scale(1);}}
+@keyframes nodePulse{0%,100%{r:22px;}50%{r:27px;}}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+.narr-content{animation:fadeSlide 0.3s ease;}
+
+@media(max-width:900px){
+  .main{grid-template-columns:1fr;grid-template-rows:auto auto auto;}
+  .right-panel{grid-row:3;grid-column:1;}
+  .timeline{grid-row:2;grid-column:1;}
+  .canvas-wrap{grid-row:1;grid-column:1;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <div class="hdr-logo">NET ATTACK SIMULATOR</div>
+    <div class="hdr-sub">// STEP-BY-STEP VISUALIZATION — AD HOC WIRELESS NETWORKS</div>
+  </div>
+</div>
+
+<div class="scenario-bar" id="scenarioBar"></div>
+
+<div class="main">
+  <div class="canvas-wrap">
+    <div class="canvas-title">
+      NETWORK TOPOLOGY
+      <span class="phase-badge" id="phaseBadge">PHASE: SETUP</span>
+    </div>
+    <svg id="netSvg" viewBox="0 0 700 300"></svg>
+  </div>
+
+  <div class="timeline" id="timeline"></div>
+
+  <div class="right-panel">
+    <div class="rp-header">
+      <div class="rp-attack-name" id="attackName">—</div>
+      <div class="rp-attack-type" id="attackType">—</div>
+    </div>
+    <div class="narrator" id="narrator"></div>
+    <div class="ctrl">
+      <button class="btn btn-prev" id="btnPrev" onclick="stepBy(-1)" disabled>◀ PREV</button>
+      <button class="btn btn-next" id="btnNext" onclick="stepBy(1)">NEXT ▶</button>
+      <button class="btn btn-auto" id="btnAuto" onclick="toggleAuto()">▶▶ AUTO</button>
+      <button class="btn btn-reset" onclick="goToStep(0)">↺ RESET</button>
+      <span class="step-counter" id="stepCounter">Step 1 / 1</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SCENARIO DEFINITIONS
+// Each scenario has: nodes, links, and steps
+// Each step has: phase, title, text, highlight nodes, packets
+const SCENARIOS = {
+
+non_clustered: {
+name: "Non-Clustered Transmission",
+type: "WSN • DIRECT COMMUNICATION",
+
+nodes:[
+ {id:"S1",x:120,y:70,label:"SENSOR-1",role:"Sensor Node",icon:"📡",color:"#4488ff"},
+ {id:"S2",x:120,y:220,label:"SENSOR-2",role:"Sensor Node",icon:"📡",color:"#4488ff"},
+ {id:"S3",x:280,y:150,label:"SENSOR-3",role:"Sensor Node",icon:"📡",color:"#4488ff"},
+ {id:"BS",x:600,y:150,label:"BASE STATION",role:"Sink",icon:"🖥️",color:"#00ff90"}
+],
+
+links:[
+ {from:"S1",to:"BS"},
+ {from:"S2",to:"BS"},
+ {from:"S3",to:"BS"}
+],
+
+steps:[
+
+{
+phase:"setup",
+phaseLabel:"STEP 1 — NETWORK SETUP",
+title:"Sensor Network Initialization",
+text:`Three sensor nodes directly communicate with the Base Station.`,
+highlightNodes:["S1","S2","S3","BS"]
+},
+
+{
+phase:"normal",
+phaseLabel:"STEP 2 — DATA TRANSMISSION",
+title:"Direct Data Transmission",
+text:`Each sensor sends data directly to the Base Station. This requires high energy because the transmission distance is large.`,
+highlightNodes:["S1","S2","S3","BS"],
+packets:[
+{id:"d1",from:"S1",to:"BS",color:"#ff7a1a",label:"DATA"},
+{id:"d2",from:"S2",to:"BS",color:"#ff7a1a",label:"DATA"},
+{id:"d3",from:"S3",to:"BS",color:"#ff7a1a",label:"DATA"}
+]
+}
+
+]
+},
+
+clustered: {
+name: "Clustered Transmission",
+type: "WSN • CLUSTER BASED COMMUNICATION",
+
+nodes:[
+ {id:"S1",x:120,y:70,label:"SENSOR-1",role:"Sensor Node",icon:"📡",color:"#4488ff"},
+ {id:"S2",x:120,y:220,label:"SENSOR-2",role:"Sensor Node",icon:"📡",color:"#4488ff"},
+ {id:"S3",x:280,y:150,label:"SENSOR-3",role:"Sensor Node",icon:"📡",color:"#4488ff"},
+ {id:"CH",x:430,y:150,label:"CLUSTER HEAD",role:"Aggregator",icon:"🧠",color:"#cc66ff"},
+ {id:"BS",x:600,y:150,label:"BASE STATION",role:"Sink",icon:"🖥️",color:"#00ff90"}
+],
+
+links:[
+ {from:"S1",to:"CH"},
+ {from:"S2",to:"CH"},
+ {from:"S3",to:"CH"},
+ {from:"CH",to:"BS"}
+],
+
+steps:[
+
+{
+phase:"setup",
+phaseLabel:"STEP 1 — CLUSTER FORMATION",
+title:"Cluster Head Selection",
+text:`One node becomes the Cluster Head. Sensor nodes send data to the cluster head.`,
+highlightNodes:["S1","S2","S3","CH"]
+},
+
+{
+phase:"attack",
+phaseLabel:"STEP 2 — DATA COLLECTION",
+title:"Sensors Send Data to Cluster Head",
+text:`Sensor nodes transmit data to the Cluster Head.`,
+highlightNodes:["S1","S2","S3","CH"],
+packets:[
+{id:"c1",from:"S1",to:"CH",color:"#00d4ff",label:"DATA"},
+{id:"c2",from:"S2",to:"CH",color:"#00d4ff",label:"DATA"},
+{id:"c3",from:"S3",to:"CH",color:"#00d4ff",label:"DATA"}
+]
+},
+
+{
+phase:"result",
+phaseLabel:"STEP 3 — AGGREGATED TRANSMISSION",
+title:"Cluster Head Sends Aggregated Data",
+text:`Cluster Head aggregates data and sends a single packet to the Base Station.`,
+highlightNodes:["CH","BS"],
+packets:[
+{id:"agg",from:"CH",to:"BS",color:"#cc66ff",label:"AGG DATA"}
+]
+}
+
+]
+}
+
+};
+// ============================================================
+// ENGINE
+// ============================================================
+let curKey = 'non_clustered';
+let curStep = 0;
+let autoTimer = null;
+
+const SVG_W = 700, SVG_H = 300;
+
+function getScenario(){ return SCENARIOS[curKey]; }
+
+// Build scenario bar
+function buildScenarioBar(){
+  const bar = document.getElementById('scenarioBar');
+  bar.innerHTML = '';
+  Object.entries(SCENARIOS).forEach(([key, sc]) => {
+    const btn = document.createElement('button');
+    btn.className = 'sc-btn' + (key===curKey ? ' active' : '');
+    btn.textContent = sc.name;
+    btn.onclick = () => selectScenario(key);
+    bar.appendChild(btn);
+  });
+}
+
+function selectScenario(key){
+  stopAuto();
+  curKey = key;
+  curStep = 0;
+  buildScenarioBar();
+  renderAll();
+}
+
+function renderAll(){
+  const sc = getScenario();
+  document.getElementById('attackName').textContent = sc.name;
+  document.getElementById('attackType').textContent = sc.type;
+  renderSVG();
+  buildTimeline();
+  renderStep();
+}
+
+// ---- SVG RENDER ----
+function renderSVG(){
+  const sc = getScenario();
+  const svg = document.getElementById('netSvg');
+  svg.innerHTML = '';
+
+  // defs
+  const defs = makeSVGEl('defs');
+  // glow filters
+  ['#4488ff','#ff2255','#00ff90','#ffe94d','#cc66ff','#ff7a1a'].forEach((c,i) => {
+    const f = makeSVGEl('filter'); f.setAttribute('id','glow'+i); f.setAttribute('x','-50%'); f.setAttribute('y','-50%'); f.setAttribute('width','200%'); f.setAttribute('height','200%');
+    const fe = makeSVGEl('feGaussianBlur'); fe.setAttribute('stdDeviation','4'); fe.setAttribute('result','blur');
+    const fe2 = makeSVGEl('feMerge');
+    const fn1 = makeSVGEl('feMergeNode'); fn1.setAttribute('in','blur');
+    const fn2 = makeSVGEl('feMergeNode'); fn2.setAttribute('in','SourceGraphic');
+    fe2.appendChild(fn1); fe2.appendChild(fn2);
+    f.appendChild(fe); f.appendChild(fe2); defs.appendChild(f);
+  });
+  svg.appendChild(defs);
+
+  // Draw links
+  sc.links.forEach(lk => {
+    const fn = sc.nodes.find(n=>n.id===lk.from);
+    const tn = sc.nodes.find(n=>n.id===lk.to);
+    if(!fn||!tn) return;
+    const line = makeSVGEl('line');
+    line.setAttribute('x1', fn.x); line.setAttribute('y1', fn.y);
+    line.setAttribute('x2', tn.x); line.setAttribute('y2', tn.y);
+    line.setAttribute('id','link-'+lk.from+'-'+lk.to);
+    if(lk.type==='tunnel'){
+      line.setAttribute('stroke','rgba(255,34,85,0.7)');
+      line.setAttribute('stroke-width','3');
+      line.setAttribute('stroke-dasharray','10 4');
+    } else if(lk.type==='attack'||lk.type==='spoof'){
+      line.setAttribute('stroke','rgba(255,34,85,0.3)');
+      line.setAttribute('stroke-width','1.5');
+      line.setAttribute('stroke-dasharray','5 3');
+    } else {
+      line.setAttribute('stroke','rgba(68,136,255,0.25)');
+      line.setAttribute('stroke-width','1.5');
+      line.setAttribute('stroke-dasharray','5 3');
+    }
+    line.setAttribute('class','link-line');
+    svg.appendChild(line);
+  });
+
+  // Draw nodes
+  sc.nodes.forEach(n => {
+    const g = makeSVGEl('g');
+    g.setAttribute('id','node-'+n.id);
+    g.setAttribute('transform',`translate(${n.x},${n.y})`);
+
+    // outer glow ring
+    const ring = makeSVGEl('circle');
+    ring.setAttribute('r','30'); ring.setAttribute('fill','none');
+    ring.setAttribute('stroke',n.color); ring.setAttribute('stroke-width','1');
+    ring.setAttribute('opacity','0.3'); ring.setAttribute('id','ring-'+n.id);
+    g.appendChild(ring);
+
+    // main circle
+    const c = makeSVGEl('circle');
+    c.setAttribute('r','22');
+    c.setAttribute('fill',hexToRgba(n.color,0.15));
+    c.setAttribute('stroke',n.color); c.setAttribute('stroke-width','2');
+    c.setAttribute('id','circle-'+n.id);
+    g.appendChild(c);
+
+    // icon text
+    const ico = makeSVGEl('text');
+    ico.setAttribute('text-anchor','middle');
+    ico.setAttribute('dominant-baseline','central');
+    ico.setAttribute('font-size','14');
+    ico.setAttribute('y','0');
+    ico.textContent = n.icon;
+    g.appendChild(ico);
+
+    // label below
+    const lbl = makeSVGEl('text');
+    lbl.setAttribute('text-anchor','middle');
+    lbl.setAttribute('y','38');
+    lbl.setAttribute('font-family','Share Tech Mono, monospace');
+    lbl.setAttribute('font-size','9');
+    lbl.setAttribute('fill','#8aa0c8');
+    lbl.textContent = n.label;
+    g.appendChild(lbl);
+
+    // role below label
+    const rl = makeSVGEl('text');
+    rl.setAttribute('text-anchor','middle');
+    rl.setAttribute('y','50');
+    rl.setAttribute('font-family','Nunito, sans-serif');
+    rl.setAttribute('font-size','8');
+    rl.setAttribute('fill','#3a5070');
+    rl.setAttribute('id','role-'+n.id);
+    rl.textContent = n.role;
+    g.appendChild(rl);
+
+    svg.appendChild(g);
+  });
+}
+
+// ---- TIMELINE ----
+function buildTimeline(){
+  const sc = getScenario();
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+  sc.steps.forEach((step, i) => {
+    const div = document.createElement('div');
+    div.className = 'tl-step' + (i===curStep?' active':'') + (i<curStep?' done':'');
+    div.onclick = () => goToStep(i);
+
+    const dot = document.createElement('div'); dot.className='tl-dot';
+    const label = document.createElement('div'); label.className='tl-label';
+    label.textContent = step.title.length > 22 ? step.title.slice(0,20)+'…' : step.title;
+    const num = document.createElement('div'); num.className='tl-num';
+    num.textContent = 'STEP '+(i+1);
+    const line = document.createElement('div'); line.className='tl-line';
+
+    div.appendChild(dot);
+    div.appendChild(num);
+    div.appendChild(label);
+    div.appendChild(line);
+    tl.appendChild(div);
+  });
+}
+
+// ---- RENDER STEP ----
+function renderStep(){
+  const sc = getScenario();
+  const step = sc.steps[curStep];
+
+  // Phase badge
+  const phaseColors = {setup:'#4488ff',normal:'#00ff90',attack:'#ff2255',result:'#ff7a1a'};
+  const pb = document.getElementById('phaseBadge');
+  pb.textContent = step.phaseLabel;
+  pb.style.color = phaseColors[step.phase];
+  pb.style.borderColor = phaseColors[step.phase];
+  pb.style.background = hexToRgba(phaseColors[step.phase], 0.1);
+
+  // Highlight / dim nodes
+  sc.nodes.forEach(n => {
+    const g = document.getElementById('node-'+n.id);
+    const c = document.getElementById('circle-'+n.id);
+    const ring = document.getElementById('ring-'+n.id);
+    if(!g||!c) return;
+
+    const isHighlight = !step.highlightNodes || step.highlightNodes.includes(n.id);
+    const isDim = step.dimNodes && step.dimNodes.includes(n.id);
+
+    if(isDim){
+      g.style.opacity = '0.2';
+    } else if(isHighlight){
+      g.style.opacity = '1';
+      c.setAttribute('stroke-width','2.5');
+      ring.setAttribute('opacity','0.4');
+    } else {
+      g.style.opacity = '0.45';
+      c.setAttribute('stroke-width','1.5');
+      ring.setAttribute('opacity','0.1');
+    }
+  });
+
+  // Animate packets
+  animatePackets(step.packets || [], step.dropAt);
+
+  // Narrator
+  renderNarrator(step);
+
+  // Timeline update
+  buildTimeline();
+
+  // Buttons
+  document.getElementById('btnPrev').disabled = curStep === 0;
+  document.getElementById('btnNext').disabled = curStep === sc.steps.length-1;
+  document.getElementById('stepCounter').textContent = `Step ${curStep+1} / ${sc.steps.length}`;
+}
+
+function renderNarrator(step){
+  const phaseClass = {setup:'np-setup',normal:'np-normal',attack:'np-attack',result:'np-result'};
+  const phaseLabel = {setup:'SETUP',normal:'NORMAL OPERATION',attack:'ATTACK',result:'RESULT'};
+
+  let html = `<div class="narr-content">
+    <div>
+      <div class="narr-phase ${phaseClass[step.phase]}">${phaseLabel[step.phase]}</div>
+    </div>
+    <div class="narr-title">${step.title}</div>
+    <div class="narr-text">${step.text}</div>`;
+
+  if(step.nodeList){
+    html += `<div class="node-list">`;
+    step.nodeList.forEach(ni => {
+      html += `<div class="node-item"><div class="ni-icon">${ni.icon}</div><div><div class="ni-name">${ni.name}</div><div class="ni-role">${ni.role}</div></div></div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  document.getElementById('narrator').innerHTML = html;
+}
+
+// ---- PACKET ANIMATION ----
+let packetEls = [];
+
+function animatePackets(packets, dropAt){
+  // Clear old
+  packetEls.forEach(p => p.remove && p.remove());
+  packetEls = [];
+
+  if(!packets || packets.length===0) return;
+
+  const sc = getScenario();
+  const svg = document.getElementById('netSvg');
+
+  packets.forEach((pkt, pi) => {
+    const fromNode = sc.nodes.find(n=>n.id===pkt.from);
+    const toNode = sc.nodes.find(n=>n.id===pkt.to);
+    if(!fromNode||!toNode) return;
+
+    setTimeout(() => {
+      const g = makeSVGEl('g');
+      g.style.transition = 'transform 0.75s ease';
+
+      // packet rect
+      const rect = makeSVGEl('rect');
+      rect.setAttribute('width','46'); rect.setAttribute('height','17');
+      rect.setAttribute('rx','4'); rect.setAttribute('ry','4');
+      rect.setAttribute('fill', pkt.color || '#4488ff');
+      rect.setAttribute('opacity','0.92');
+      if(pkt.dashed){
+        rect.setAttribute('fill','none');
+        rect.setAttribute('stroke', pkt.color||'#ff2255');
+        rect.setAttribute('stroke-width','1.5');
+        rect.setAttribute('stroke-dasharray','4 2');
+      }
+      g.appendChild(rect);
+
+      const txt = makeSVGEl('text');
+      txt.setAttribute('x','23'); txt.setAttribute('y','12');
+      txt.setAttribute('text-anchor','middle');
+      txt.setAttribute('font-family','Share Tech Mono, monospace');
+      txt.setAttribute('font-size','7');
+      txt.setAttribute('fill','#fff');
+      txt.setAttribute('font-weight','700');
+      txt.textContent = pkt.label || 'PKT';
+      g.appendChild(txt);
+
+      g.setAttribute('transform',`translate(${fromNode.x-23},${fromNode.y-8})`);
+      g.style.opacity = '1';
+      svg.appendChild(g);
+      packetEls.push(g);
+
+      // Animate to target
+      setTimeout(()=>{
+        const tx = (dropAt && dropAt===pkt.to) ? toNode.x - 23 : toNode.x - 23;
+        const ty = (dropAt && dropAt===pkt.to) ? toNode.y - 8 : toNode.y - 8;
+        g.setAttribute('transform',`translate(${tx},${ty})`);
+        g.style.transition = 'transform 0.75s ease, opacity 0.5s';
+
+        if(dropAt && dropAt===pkt.to){
+          setTimeout(()=>{ g.style.opacity='0'; }, 800);
+          // show X
+          setTimeout(()=>{
+            const xMark = makeSVGEl('text');
+            xMark.setAttribute('x', toNode.x); xMark.setAttribute('y', toNode.y-30);
+            xMark.setAttribute('text-anchor','middle'); xMark.setAttribute('font-size','18');
+            xMark.setAttribute('fill','#ff2255'); xMark.textContent='✕';
+            xMark.style.opacity='1'; xMark.style.transition='opacity 0.5s';
+            svg.appendChild(xMark); packetEls.push(xMark);
+            setTimeout(()=>xMark.style.opacity='0',1200);
+          }, 800);
+        } else {
+          setTimeout(()=>{ g.style.opacity='0'; }, 900);
+        }
+      }, 80);
+
+    }, pi * 320);
+  });
+}
+
+// ---- NAVIGATION ----
+function stepBy(d){
+  stopAuto();
+  const sc = getScenario();
+  curStep = Math.max(0, Math.min(sc.steps.length-1, curStep+d));
+  renderStep();
+}
+
+function goToStep(i){
+  stopAuto();
+  curStep = i;
+  renderStep();
+}
+
+function toggleAuto(){
+  if(autoTimer){
+    stopAuto();
+  } else {
+    document.getElementById('btnAuto').textContent='⏸ PAUSE';
+    document.getElementById('btnAuto').style.color='var(--orange)';
+    document.getElementById('btnAuto').style.borderColor='var(--orange)';
+    autoTimer = setInterval(()=>{
+      const sc = getScenario();
+      if(curStep >= sc.steps.length-1){ stopAuto(); return; }
+      curStep++;
+      renderStep();
+    }, 3000);
+  }
+}
+
+function stopAuto(){
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  document.getElementById('btnAuto').textContent='▶▶ AUTO';
+  document.getElementById('btnAuto').style.color='var(--green)';
+  document.getElementById('btnAuto').style.borderColor='var(--green)';
+}
+
+// ---- HELPERS ----
+function makeSVGEl(tag){
+  return document.createElementNS('http://www.w3.org/2000/svg', tag);
+}
+
+function hexToRgba(hex, alpha){
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ---- INIT ----
+buildScenarioBar();
+renderAll();
+</script>
+</body>
+</html>
